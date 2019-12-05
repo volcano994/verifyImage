@@ -21,7 +21,6 @@ var processImage = function (info, imageIndex) {
           'y': info.y,
           'vkey': info.vkey
         }
-        console.log(info);
         reslove(result)
       })
     } catch (err) {

@@ -23,6 +23,10 @@ app.all('*', function (req, res, next) {
   next();
 });
 
+app.get('/', (req, res) => {
+  res.send('Welcome to Volcano');
+})
+
 app.use('/common', common);
 
 app.listen(3000, function () {
