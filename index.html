@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    .display-container {
+      position: relative;
+      width: 300px;
+      height: 330px;
+      padding: 20px;
+      border: 1px solid black;
+      border-radius: 10px;
+    }
+
+    .origin-img {
+      width: 300px;
+      height: 280px;
+      position: relative;
+    }
+
+    .cut-img {
+      width: 50px;
+      height: 50px;
+      position: absolute;
+      left: 0
+    }
+
+    .drag-container {
+      width: 300px;
+      height: 40px;
+      margin-top: 10px;
+      border: 1px solid black;
+      position: relative;
+    }
+
+    .block {
+      position: absolute;
+      width: 50px;
+      height: 100%;
+      background-color: #000;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container"></div>
+</body>
+<script>
+  var Verify = {
+    init: function (appid, container) {
+      this.verifyInfo = {
+        vkey: "",
+        appid: appid || new Date().toLocaleDateString() + 'Event',
+        initX: 0,
+        xv: 0,
+        xy: 0,
+        currentTime: null
+      }
+      this.container = container;
+      this.enableClick = false;
+      this.enableMove = false;
+      this.addDom(container);
+      this.getVerifyImage();
+
+      // bind events
+      this.handleMouseDown = this.handleMouseDown.bind(this);
+      this.handleMouseMove = this.handleMouseMove.bind(this);
+      this.handleMouseUp = this.handleMouseUp.bind(this);
+    },
+    addDom: function (container) {
+      var str =
+        '<div class="display-container"><div class="origin-img"><div class="cut-img"></div></div><div class="drag-container"><div class="block"></div></div></div>';
+      var containerDOM = document.querySelector(container);
+      containerDOM.innerHTML = str;
+    },
+    activateBlock: function () {
+      var block = document.querySelector('.block');
+      this.enableClick = true;
+      block.addEventListener('mousedown', this.handleMouseDown)
+    },
+    handleMouseDown: function (e) {
+      if (!this.enableClick) {
+        return;
+      }
+      console.log()
+      this.enableMove = true;
+      this.verifyInfo.time = new Date();
+      var block = e.target;
+      var container = document.querySelector(this.container)
+      this.verifyInfo.initX = e.clientX;
+      container.addEventListener('mousemove', this.handleMouseMove);
+      container.addEventListener('mouseup', this.handleMouseUp);
+    },
+    handleMouseMove: function (e) {
+      if (!this.enableMove) {
+        return;
+      }
+      this.verifyInfo.vx = e.clientX - this.verifyInfo.initX;
+      if (this.verifyInfo.vx < 0) {
+        this.verifyInfo.vx = 0
+      } else if (this.verifyInfo.vx > 250) {
+        this.verifyInfo.vx = 250
+      };
+      let block = document.querySelector('.block');
+      block.style.left = this.verifyInfo.vx + 'px';
+      let cutImg = document.querySelector('.cut-img');
+      cutImg.style.left = this.verifyInfo.vx + 'px';
+    },
+    handleMouseUp: function (e) {
+      if (!this.enableMove) {
+        return;
+      }
+      var block = e.target;
+      var currentTime = new Date();
+      var diffTime = currentTime - this.verifyInfo.time;
+      this.Check(this.verifyInfo.vx, this.verifyInfo.vy, (diffTime / 1000));
+      this.enableMove = false;
+      this.enableClick = false;
+    },
+    removeEvents: function () {
+      var block = document.querySelector('.block')
+      block.removeEventListener('mousedown', this.handleMouseDown);
+      block.removeEventListener('mousemove', this.handleMouseMove);
+      block.removeEventListener('mouseup', this.handleMouseUp);
+    },
+    getVerifyImage: function () {
+      var _this = this;
+      this.ajax({
+        // url: "http://10.246.58.193/node/2019/api/common/getVerifyImage",
+        url: "http://localhost:3000/common/getVerifyImage",
+        type: 'post',
+        dataType: 'json',
+        data: {
+          appid: _this.verifyInfo.appid
+        },
+        success: function (res) {
+          _this.verifyInfo.vkey = res.vkey;
+          _this.verifyInfo.vy = res.y;
+          var originImg = document.querySelector('.origin-img')
+          originImg.style.background = 'url(' + res.origin + ')';
+          var cutImg = document.querySelector('.cut-img');
+          cutImg.style.background = 'url(' + res.cut + ')';
+          cutImg.style.top = _this.verifyInfo.vy + 'px';
+          _this.activateBlock();
+        }
+      });
+    },
+    Check: function (vx, vy, vtime) {
+      var _this = this;
+      this.ajax({
+        url: "http://chuanshi.sdo.com/Public/GV/Check.ashx",
+        type: "post",
+        dataType: "json",
+        data: {
+          "appid": _this.verifyInfo.appid,
+          "vkey": _this.verifyInfo.vkey,
+          vx,
+          vy,
+          vtime
+        },
+        success: function (res) {
+          switch (res) {
+            case 1:
+              alert('验证成功');
+              break;
+            case -1:
+              _this.retry.call(_this);
+              break;
+            case -2:
+              console.log('已验证');
+              _this.retry.call(_this);
+              break;
+          }
+        }
+      })
+    },
+    retry: function () {
+      var _this = this;
+      var cutImg = document.querySelector('.cut-img');
+      var block = document.querySelector('.block');
+      cutImg.style.transition = "0.2s all,0.5s left";
+      block.style.transition = "0.5s left";
+      cutImg.style.opacity = "0";
+      setTimeout(function () {
+        cutImg.style.left = 0;
+        block.style.left = 0;
+        setTimeout(function () {
+          cutImg.style.opacity = "1";
+          setTimeout(function () {
+            cutImg.style.transition = "none";
+            block.style.transition = "none";
+            _this.enableClick = true;
+          }, 200)
+        }, 500)
+      }, 200)
+    },
+    ajax: function (param) {
+      let xhr = null;
+      if (window.XMLHttpRequest) {
+        xhr = new XMLHttpRequest();
+      } else {
+        xhr = ActiveXObject("Microsoft.XMLHTTP");
+      }
+      xhr.open(param.type, param.url, true);
+
+      xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      xhr.send(param.data ? this.getQueryString(param.data) : '');
+
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4) {
+          if (xhr.status == 200) {
+            if (param.success) {
+              param.success(JSON.parse(xhr.responseText));
+            } else {
+              if (param.error) {
+                param.error();
+              }
+            }
+          }
+        }
+      }
+    },
+    getQueryString: function (data) {
+      var res = []
+      for (var key in data) {
+        res.push(key + '=' + data[key])
+      }
+      return res.join('&');
+    }
+  }
+
+  Verify.init('test', '.container')
+
+</script>
+
+</html>
